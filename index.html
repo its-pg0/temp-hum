@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ESP8266 DHT Sensor</title>
+    <style>
+      * {
+        text-align: center;
+      }
+      .wrapper {
+        border-radius: 20px;
+        display: flex;
+        background-color: #fff8e8;
+        height: 450px;
+        width: 550px;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 50px;
+
+        .div {
+          display: flex;
+          justify-content: space-evenly;
+          align-items: center;
+          width: 100%;
+          height: inherit;
+
+          .subdiv {
+            display: flex;
+            justify-content: center;
+            background-color: #f7eed3;
+            border: 1px solid #dba979;
+            border-radius: 10px;
+            height: 80%;
+            width: 40%;
+            position: relative;
+          }
+        }
+      }
+
+      /* Small devices (phones, 600px and down) */
+      @media only screen and (max-width: 600px) {
+        .wrapper {
+          font-size: 11px;
+
+          .div {
+            font-size: 15px;
+          }
+        }
+      }
+
+      @keyframes progress {
+        0% {
+          --percentage: 0;
+        }
+        100% {
+          --percentage: var(--value);
+        }
+      }
+
+      @property --percentage {
+        syntax: "<number>";
+        inherits: true;
+        initial-value: 0;
+      }
+
+      [role="progressbar"] {
+        --percentage: var(--value);
+        --primary: linear-gradient(
+          to top,
+
+          #fcf7ed,
+          #fdf1da,
+          #f9e0ae,
+          #e4b351,
+          #eca452
+        );
+        --secondary: #f7f7f7; /* Light gray background */
+        --size: 200px;
+        animation: progress 0.5s forwards;
+        width: 30px; /* Narrower for a vertical bar */
+        height: var(--size); /* Set height for the vertical bar */
+        border-radius: 20px; /* Rounded bar */
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: flex-end; /* Align content at the bottom for vertical fill */
+        justify-content: center;
+        background: var(--secondary);
+        border: 2px solid #ccc;
+        position: relative;
+      }
+      [role="progressbar2"] {
+        --percentage: var(--value);
+        --primary2: linear-gradient(
+          to top,
+          #def7fac7,
+          #d2f6fbc7,
+          #b6f0f8c7,
+          #aff0f9c7,
+          #65e5f6c7
+        );
+        --secondary: #f7f7f7; /* Light gray background */
+        --size: 200px;
+        animation: progress 0.5s forwards;
+        width: 30px; /* Narrower for a vertical bar */
+        height: var(--size); /* Set height for the vertical bar */
+        border-radius: 20px; /* Rounded bar */
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: flex-end; /* Align content at the bottom for vertical fill */
+        justify-content: center;
+        background: var(--secondary);
+        border: 2px solid #ccc;
+        position: relative;
+      }
+
+      [role="progressbar"]::before {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: calc(var(--percentage) * 1%);
+        background: var(--primary); /* Use gradient as background */
+      }
+      [role="progressbar2"]::before {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: calc(var(--percentage) * 1%);
+        background: var(--primary2); /* Use gradient as background */
+      }
+
+      .temperature-display {
+        text-align: center;
+      }
+
+      body {
+        display: flex;
+        justify-content: center;
+        background: #f0f8ff;
+
+        .temp {
+          position: absolute;
+          top: 55px;
+        }
+
+        .contain {
+          height: 200px;
+          position: relative;
+
+          .top {
+            position: absolute;
+            top: 2px;
+            left: -28px;
+          }
+          .bottom {
+            position: absolute;
+            bottom: 0px;
+            left: -12px;
+          }
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <h1>Temperature and Humidity Monitor</h1>
+      <div class="div">
+        <div class="subdiv">
+          <p>Temperature: <span id="temperature">--</span></p>
+          <div class="temp">
+            <div class="contain">
+              <span class="top">100</span>
+              <div
+                id="tempe"
+                role="progressbar"
+                aria-valuenow="60"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                style="--value: "
+              ></div>
+              <span class="bottom">0</span>
+            </div>
+          </div>
+        </div>
+        <div class="subdiv">
+          <p>Humidity: <span id="humidity">--</span></p>
+          <div class="temp">
+            <div class="contain">
+              <span class="top">100</span>
+              <div
+                id="humi"
+                role="progressbar2"
+                aria-valuenow="60"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                style="--value: "
+              ></div>
+              <span class="bottom">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
+    <script>
+      // Secure MQTT Broker details
+      const brokerUrl = "wss://test.mosquitto.org:8081"; // Secure WebSocket connection URL
+      const topic = "/data/temp&hum"; // Replace with your MQTT topic
+
+      // Initialize MQTT Client
+      const client = mqtt.connect(brokerUrl);
+
+      // Handle successful connection
+      client.on("connect", () => {
+        console.log("Connected securely to Mosquitto broker");
+        client.subscribe(topic, (err) => {
+          if (err) {
+            console.log("Subscription error:", err);
+          } else {
+            console.log(`Subscribed to topic: ${topic}`);
+          }
+        });
+      });
+
+      // Handle incoming messages
+      client.on("message", (topic, message) => {
+        console.log("Message received:", message.toString());
+        const data = JSON.parse(message.toString()); // Assuming JSON format
+
+        // Update webpage with temperature and humidity
+        document.getElementById("temperature").innerText =
+          data.temperature + " °C";
+        document
+          .getElementById("tempe")
+          .style.setProperty("--value", data.temperature);
+        console.log(`Temperature: ${data.temperature}`);
+        document
+          .getElementById("humi")
+          .style.setProperty("--value", data.humidity);
+        document.getElementById("humidity").innerText = data.humidity + " %";
+        console.log(`Humidity: ${data.humidity}`);
+      });
+
+      // Handle connection errors
+      client.on("error", (error) => {
+        console.log("Connection failed:", error);
+      });
+    </script>
+  </body>
+</html>
